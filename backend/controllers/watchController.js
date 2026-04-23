@@ -95,3 +95,16 @@ export async function getWatchesByBrand(req, res) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }
+
+export async function getWatchById(req, res) {
+  try {
+    const { id } = req.params;
+    const watch = await Watch.findById(id);
+    if (!watch) {
+      return res.status(404).json({ success: false, message: "Watch not found" });
+    }
+    return res.json({ success: true, data: watch });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}

@@ -565,6 +565,24 @@ export const contactPageStyles = {
   buttonIndigo: "bg-indigo-600 text-white",
 };
 
+  // watch detail page styles
+export const watchDetailStyles = {
+  container: "min-h-screen bg-white pt-24 pb-12 px-4 sm:px-6 lg:px-12",
+  wrapper: "max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center",
+  imageSection: "relative bg-gray-50 rounded-3xl p-8 flex justify-center items-center overflow-hidden",
+  image: "w-full h-auto max-h-[500px] object-contain transition-transform duration-500 hover:scale-105",
+  contentSection: "flex flex-col space-y-6",
+  categoryTag: "text-amber-600 uppercase tracking-widest text-sm font-semibold",
+  title: "text-4xl md:text-5xl font-bold text-gray-900 font-[pacifico]",
+  brandName: "text-xl text-gray-500 font-light tracking-wide italic",
+  price: "text-3xl font-semibold text-gray-800 border-b pb-4",
+  descriptionTitle: "text-lg font-bold uppercase tracking-tighter text-gray-700",
+  description: "text-gray-600 leading-relaxed text-lg",
+  actionsContainer: "flex flex-col sm:flex-row gap-4 pt-6",
+  addToCartBtn: "flex-1 bg-gradient-to-r from-gray-700 to-black text-white py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2",
+  backBtn: "flex items-center gap-2 text-gray-500 hover:text-black transition-colors font-medium"
+};
+
 // Update in src/assets/dummyStyles.js
 
 export const categoriesHomeStyles = {

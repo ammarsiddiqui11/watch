@@ -5,6 +5,7 @@ import CS2 from "../../assets/CS2.png";
 import CS3 from "../../assets/CS3.png";
 import CS4 from "../../assets/CS4.png";
 import CS5 from "../../assets/CS5.png";
+import { Link } from "react-router-dom"; //
 const watches = [
   {
     id: 1,
@@ -74,6 +75,7 @@ export default function ComingSoonWatchesPage() {
                 className={comingSoonStyles.watchItem}
               >
                 {/* image - no card, no border, using image URL */}
+                <Link to={`/watch/${w.id}`}>
                 <div className={comingSoonStyles.imageContainer}>
                   <img
                     src={w.imgUrl}
@@ -87,12 +89,15 @@ export default function ComingSoonWatchesPage() {
                     }}
                   />
                 </div>
+                </Link>
 
                 {/* name */}
                 <figcaption className={comingSoonStyles.figcaption}>
+                  <Link to={`/watch/${w.id}`}>
                   <div className={comingSoonStyles.watchName}>
                     {w.name}
                   </div>
+                  </Link>
                   <div className={comingSoonStyles.price}>
                     {formatINR(w.price)}
                   </div>

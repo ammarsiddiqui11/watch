@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useCart } from "../../CartContext.jsx"; // adjust path if needed
 import { WATCHES as DUMMY_WATCHES, FILTERS as RAW_FILTERS } from "./dummydata";
 import { watchPageStyles } from "../../assets/dummyStyles";
+import { Link } from "react-router-dom"; //
 
 const ICON_MAP = { Grid, User, Users };
 const FILTERS = RAW_FILTERS?.length
@@ -228,6 +229,7 @@ export default function WatchPage() {
             return (
               <div key={sid} className={watchPageStyles.card}>
                 <div className={watchPageStyles.imageContainer}>
+                  <Link to={`/watches/${sid}`}>
                   <img
                     src={w.img}
                     alt={w.name}
@@ -239,6 +241,7 @@ export default function WatchPage() {
                         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='Arial' font-size='16'%3EImage not available%3C/text%3E%3C/svg%3E";
                     }}
                   />
+                  </Link>
 
                   <div className={watchPageStyles.cartControlsContainer}>
                     {qty > 0 ? (
@@ -286,7 +289,9 @@ export default function WatchPage() {
                 </div>
 
                 <div className={watchPageStyles.productInfo}>
+                  <Link to={`/watches/${sid}`} >
                   <h3 className={watchPageStyles.productName}>{w.name}</h3>
+                  </Link>
                   <p className={watchPageStyles.productDescription}>{w.desc}</p>
                   <div className={watchPageStyles.productPrice}>₹{w.price}</div>
                 </div>

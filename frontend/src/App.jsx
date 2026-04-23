@@ -12,6 +12,7 @@ import SignUp from "./pages/SignUp/SignUp";
 import Cart from "./pages/Cart/Cart";
 import Orders from "./pages/Orders/Orders";
 import VerifyPaymentPage from "../VerifyPaymentPage";
+import WatchDetail from "./pages/WatchDetail/WatchDetail";
 
 /* ScrollToTopOnRouteChange: uses useLocation — OK because App is inside BrowserRouter in index.jsx */
 function ScrollToTopOnRouteChange() {
@@ -85,6 +86,7 @@ export default function App() {
       {/* Only Route (or Fragment) components as direct children of Routes */}
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/watches/:id" element={<WatchDetail />} />
         <Route path="/watches" element={<Watches />} />
         <Route path="/brands/:brandName" element={<Brand />} />
         <Route path="/contact" element={<Contact />} />
