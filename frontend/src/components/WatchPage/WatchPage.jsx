@@ -63,7 +63,7 @@ export default function WatchPage() {
 
   // normalize server item -> UI shape
   const mapServerToUI = (item) => {
-    let img = item.image ?? item.img ?? "";
+    let img = (Array.isArray(item.image) ? item.image[0] : item.image) ?? item.img ?? "";
     // normalize image url (handles /uploads, localhost, http->https upgrade)
     img = normalizeImageUrl(img);
 

@@ -25,7 +25,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // routes
-watchRouter.post("/", upload.single("image"), createWatch);
+watchRouter.post("/", upload.array("images",10), createWatch);
 watchRouter.get("/", getWatches);
 watchRouter.delete("/:id", deleteWatch);
 watchRouter.get('/brands/:brandName', getWatchesByBrand);

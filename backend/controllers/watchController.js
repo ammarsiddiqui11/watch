@@ -8,12 +8,26 @@ const API_BASE = "http://localhost:4000";
 export async function createWatch(req, res) {
   try {
     const { name, description, price, category, brandName } = req.body;
-    let image = req.body.image;
+    
+    // 1. Initialize images as an empty array
+    let images = [];
 
-    if (req.file?.filename) image = `${API_BASE}/uploads/${req.file.filename}`;
+    // 2. Map through uploaded files to build the URL array
+    if (req.files && req.files.length > 0) {
+      images = req.files.map(file => `${API_BASE}/uploads/${file.filename}`);
+    } 
 
-    if (!name || !description || !price || !image) {
-      return res.status(400).json({ success: false, message: "name, description, price and image are required" });
+    // 3. Fallback to req.body.images if provided as a pre-existing list/string
+    if (images.length === 0 && req.body.images) {
+      images = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
+    }
+
+    // Validation
+    if (!name || !description || !price || images.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "name, description, price and at least one image are required" 
+      });
     }
 
     const doc = new Watch({
@@ -23,7 +37,7 @@ export async function createWatch(req, res) {
       price,
       category,
       brandName,
-      image,
+      image: images, // Save the array of strings
     });
 
     const saved = await doc.save();

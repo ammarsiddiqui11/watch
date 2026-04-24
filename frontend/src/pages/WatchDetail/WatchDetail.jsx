@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ShoppingBag, ArrowLeft, Loader2, Minus, Plus } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Loader2, Minus, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -43,6 +43,7 @@ const WatchDetail = () => {
   const navigate = useNavigate();
   const [watch, setWatch] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
   const { cart, addItem, increment, decrement, removeItem } = useCart();
 
@@ -92,14 +93,24 @@ const WatchDetail = () => {
 
   const sid = String(watch._id ?? watch.id ?? id);
   const qty = getQty(sid);
-  const img = normalizeImageUrl(watch.image ?? watch.img ?? "");
+
+  // Use images array; fall back to single image field for backwards compatibility
+  const images = watch.images?.length
+    ? watch.images
+    : Array.isArray(watch.image) && watch.image.length
+    ? watch.image
+    : watch.img
+    ? [watch.img]
+    : [];
+
+  const currentImg = normalizeImageUrl(images[currentImgIndex] ?? "");
 
   const handleAddToCart = () => {
     addItem({
       id: sid,
       name: watch.name,
       price: watch.price,
-      img,
+      img: normalizeImageUrl(images[0] ?? ""),
     });
     toast.success(`${watch.name} added to cart!`);
   };
@@ -119,9 +130,24 @@ const WatchDetail = () => {
       <div className={watchDetailStyles.wrapper}>
         {/* Left: Image */}
         <div className={watchDetailStyles.imageSection}>
+
+          {/* Arrow Left */}
+          {images.length > 1 && (
+            <button
+              onClick={() =>
+                setCurrentImgIndex((prev) =>
+                  prev === 0 ? images.length - 1 : prev - 1
+                )
+              }
+              className="absolute left-2 z-10 p-2 bg-white/70 rounded-full hover:bg-white shadow-md transition-all"
+            >
+              <ChevronLeft size={24} />
+            </button>
+          )}
+
           <img
-            src={img}
-            alt={watch.name}
+            src={currentImg}
+            alt={`${watch.name} - ${currentImgIndex + 1}`}
             className={watchDetailStyles.image}
             onError={(e) => {
               e.currentTarget.style.objectFit = "contain";
@@ -129,6 +155,34 @@ const WatchDetail = () => {
                 "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='Arial' font-size='16'%3EImage not available%3C/text%3E%3C/svg%3E";
             }}
           />
+
+          {/* Right Arrow */}
+          {images.length > 1 && (
+            <button
+              onClick={() =>
+                setCurrentImgIndex((prev) =>
+                  prev === images.length - 1 ? 0 : prev + 1
+                )
+              }
+              className="absolute right-2 z-10 p-2 bg-white/70 rounded-full hover:bg-white shadow-md transition-all"
+            >
+              <ChevronRight size={24} />
+            </button>
+          )}
+
+          {/* Dot Indicators */}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 flex gap-2">
+              {images.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`h-1.5 rounded-full transition-all ${
+                    idx === currentImgIndex ? "bg-black w-4" : "bg-gray-300 w-1.5"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: Info */}

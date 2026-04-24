@@ -7,6 +7,7 @@ import {
   Trash2,
   Upload,
   Sparkles,
+  X,
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -14,8 +15,9 @@ import axios from "axios";
 import { themes, themeButtonColors, classes, getInputClass } from "../../assets/dummyStyles";
 
 export default function AddPage() {
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  // FIX: imageFiles is now an array; imagePreviewUrls is an array of object-URLs
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -42,15 +44,16 @@ export default function AddPage() {
   const theme = themes[activeColor];
   const inputClass = getInputClass(theme);
 
+  // FIX: Revoke all object-URLs when imageFiles changes to avoid memory leaks
   useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl("");
+    if (imageFiles.length === 0) {
+      setImagePreviewUrls([]);
       return;
     }
-    const url = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [imageFile]);
+    const urls = imageFiles.map((f) => URL.createObjectURL(f));
+    setImagePreviewUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [imageFiles]);
 
   useEffect(() => {
     if (category !== "brand") setBrandName("");
@@ -58,19 +61,43 @@ export default function AddPage() {
 
   const clearFileInput = () => {
     if (inputRef.current) inputRef.current.value = "";
-    setImageFile(null);
-    setImagePreviewUrl("");
+    setImageFiles([]);
+    setImagePreviewUrls([]);
   };
 
+  // FIX: Remove a single image by index, keep the rest
+  const removeImageAt = (index) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    // If the native input still holds a reference, reset it so the user can
+    // re-select the same file if needed.
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  // FIX: Accept ALL selected files, validate each, and append to existing list
   const handleImageChange = (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!f.type.startsWith("image/"))
-      return toast.error("Please select an image file");
+    const newFiles = Array.from(e.target.files ?? []);
+    if (!newFiles.length) return;
+
     const maxMB = 5;
-    if (f.size > maxMB * 1024 * 1024)
-      return toast.error(`Image too large (max ${maxMB} MB)`);
-    setImageFile(f);
+    const valid = [];
+    for (const f of newFiles) {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`"${f.name}" is not an image — skipped.`);
+        continue;
+      }
+      if (f.size > maxMB * 1024 * 1024) {
+        toast.error(`"${f.name}" exceeds ${maxMB} MB — skipped.`);
+        continue;
+      }
+      valid.push(f);
+    }
+
+    if (valid.length) {
+      setImageFiles((prev) => [...prev, ...valid]);
+    }
+
+    // Reset native input so the same file can be picked again later
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   const resetForm = () => {
@@ -84,8 +111,8 @@ export default function AddPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageFile || !name.trim() || !description.trim() || !price.trim())
-      return toast.error("Please fill all fields and select an image.");
+    if (!imageFiles.length || !name.trim() || !description.trim() || !price.trim())
+      return toast.error("Please fill all fields and select at least one image.");
     if (isNaN(Number(price)) || Number(price) <= 0)
       return toast.error("Enter a valid price greater than 0.");
     if (category === "brand" && !brandName.trim())
@@ -94,7 +121,11 @@ export default function AddPage() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("image", imageFile);
+
+      // FIX: Append every file under the field name "images" (matches multer's
+      // array("images") on the backend / req.files in the controller)
+      imageFiles.forEach((f) => formData.append("images", f));
+
       formData.append("name", name.trim());
       formData.append("description", description.trim());
       formData.append("price", String(Number(price)));
@@ -152,29 +183,43 @@ export default function AddPage() {
           >
             <div>
               <div className={classes.formLabel}>
-                <Upload className="w-4 h-4" /> Watch Image{" "}
+                <Upload className="w-4 h-4" /> Watch Images{" "}
                 <span className={classes.requiredStar}>*</span>
               </div>
 
+              {/* FIX: Render a thumbnail strip for every selected image */}
+              {imagePreviewUrls.length > 0 && (
+                <div className="flex flex-wrap gap-3 mb-3">
+                  {imagePreviewUrls.map((url, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                      <img
+                        src={url}
+                        alt={`preview-${idx}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImageAt(idx)}
+                        className="absolute top-0.5 right-0.5 bg-white/90 hover:bg-white rounded-full p-0.5 shadow transition"
+                        aria-label={`Remove image ${idx + 1}`}
+                      >
+                        <X className="w-3 h-3 text-gray-700" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex items-center gap-4">
-                <div
-                  className={`${classes.imagePreviewContainer(theme)} ${
-                    imagePreviewUrl ? "" : classes.imagePreviewEmpty
-                  }`}
-                >
-                  {imagePreviewUrl ? (
-                    <img
-                      src={imagePreviewUrl}
-                      alt="preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
+                {/* Placeholder shown only when no images selected */}
+                {imagePreviewUrls.length === 0 && (
+                  <div className={`${classes.imagePreviewContainer(theme)} ${classes.imagePreviewEmpty}`}>
                     <div className={classes.imagePlaceholder}>
                       <Image className="w-8 h-8" />
-                      <div className="text-xs">No image</div>
+                      <div className="text-xs">No images</div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="flex-1">
                   <label
@@ -182,7 +227,10 @@ export default function AddPage() {
                     className={classes.uploadButton}
                   >
                     <PlusCircle className="w-4 h-4 text-slate-700" />
-                    <span className="text-slate-700 text-sm">Choose Image</span>
+                    <span className="text-slate-700 text-sm">
+                      {imageFiles.length > 0 ? "Add More Images" : "Choose Images"}
+                    </span>
+                    {/* FIX: multiple attribute kept; onChange now handles all files */}
                     <input
                       id="watch-image"
                       ref={inputRef}
@@ -190,20 +238,21 @@ export default function AddPage() {
                       accept="image/*"
                       onChange={handleImageChange}
                       className="hidden"
+                      multiple
                     />
                   </label>
 
-                  {imagePreviewUrl && (
+                  {imageFiles.length > 0 && (
                     <button
                       type="button"
                       onClick={clearFileInput}
                       className={classes.removeButton}
                     >
-                      <Trash2 className="w-4 h-4 text-slate-600" /> Remove
+                      <Trash2 className="w-4 h-4 text-slate-600" /> Remove All
                     </button>
                   )}
                   <p className={classes.helperText}>
-                    Recommended: JPG/PNG. Max size: 5MB.
+                    Recommended: JPG/PNG. Max size: 5 MB per image.
                   </p>
                 </div>
               </div>
@@ -322,13 +371,19 @@ export default function AddPage() {
               <div
                 className={classes.previewCard(theme)}
               >
-                {imagePreviewUrl ? (
+                {imagePreviewUrls.length > 0 ? (
                   <div className={classes.previewImageContainer}>
+                    {/* Preview shows the first selected image */}
                     <img
-                      src={imagePreviewUrl}
+                      src={imagePreviewUrls[0]}
                       alt="watch"
                       className="w-full h-full object-cover"
                     />
+                    {imagePreviewUrls.length > 1 && (
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                        +{imagePreviewUrls.length - 1} more
+                      </div>
+                    )}
                     <div className={classes.previewNewBadge}>
                       New
                     </div>
