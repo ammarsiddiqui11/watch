@@ -250,12 +250,12 @@ const Footer = () => {
             <p className={footerStyles.designerLink}>
               Designed by{" "}
               <a
-                href="https://hexagondigitalservices.com"
+                href="www.google.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={footerStyles.linkHover}
               >
-                Hexagon Digital Services
+                Newman digital services
               </a>
             </p>
           </div>

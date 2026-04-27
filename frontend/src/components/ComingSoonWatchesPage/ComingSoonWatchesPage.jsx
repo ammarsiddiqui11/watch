@@ -1,48 +1,68 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { Link } from "react-router-dom";
 import { comingSoonStyles } from "../../assets/dummyStyles";
-import CS1 from "../../assets/CS1.png";
-import CS2 from "../../assets/CS2.png";
-import CS3 from "../../assets/CS3.png";
-import CS4 from "../../assets/CS4.png";
-import CS5 from "../../assets/CS5.png";
-import { Link } from "react-router-dom"; //
-const watches = [
-  {
-    id: 1,
-    name: "Norqain Independence",
-    price: 619000,
-    imgUrl: CS1,
-  },
-  {
-    id: 2,
-    name: "Zenith Chronomaster",
-    price: 1069200,
-    imgUrl: CS2,
-  },
-  {
-    id: 3,
-    name: "Jacob & Co. Epic X ",
-    price: 3100000,
-    imgUrl: CS3,
-  },
-  {
-    id: 4,
-    name: "Bvlgari Octo",
-    price: 2450000,
-    imgUrl: CS4,
-  },
-  {
-    id: 5,
-    name: "Louis Erard Excellence",
-    price: 3300000,
-    imgUrl: CS5,
-  },
-];
 
-// Use the format function from styles
-const formatINR = comingSoonStyles.formatINR;
+const API_BASE = "http://localhost:4000";
+
+// --- helper: same normalization logic from WatchPage ---
+function normalizeImageUrl(raw) {
+  if (!raw) return "";
+  if (typeof raw !== "string") return "";
+  const baseHost = API_BASE.replace(/\/api\/?$/i, "") || API_BASE;
+  if (raw.startsWith("/")) return `${baseHost}${raw}`;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(raw)) {
+    return raw.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, baseHost);
+  }
+  return raw;
+}
 
 export default function ComingSoonWatchesPage() {
+  const [watches, setWatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Use the format function from styles
+  const formatINR = comingSoonStyles.formatINR;
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchRecentWatches = async () => {
+      setLoading(true);
+      try {
+        // Fetching with a limit of 5 to show the most recent arrivals
+        // If your backend supports sorting, you could add: ?sort=-createdAt
+        const resp = await axios.get(`${API_BASE}/api/watches?limit=5`);
+        const data = resp.data;
+        
+        const items = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.watches)
+          ? data.watches
+          : [];
+
+        if (mounted) {
+          const mapped = items.map((item) => ({
+            id: item._id ?? item.id,
+            name: item.name ?? "",
+            price: item.price ?? 0,
+            // Map image/img and normalize the URL
+            imgUrl: normalizeImageUrl((Array.isArray(item.image) ? item.image[0] : item.image) ?? item.img ?? ""),
+          }));
+          setWatches(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch recent watches:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchRecentWatches();
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <section className={comingSoonStyles.section}>
       <div className={comingSoonStyles.container}>
@@ -55,56 +75,48 @@ export default function ComingSoonWatchesPage() {
               New Arrivals
             </h2>
             <p className={comingSoonStyles.subtitle}>
-              Coming Soon
+              Recently Added
             </p>
           </div>
-          <a
-            className={comingSoonStyles.viewAllLink}
-            href="/watches"
-          >
+          <Link className={comingSoonStyles.viewAllLink} to="/watches">
             View All ›
-          </a>
+          </Link>
         </div>
 
-        {/* watches row */}
         <div className={comingSoonStyles.watchesContainer}>
-          <div className={comingSoonStyles.watchesRow}>
-            {watches.map((w) => (
-              <figure
-                key={w.id}
-                className={comingSoonStyles.watchItem}
-              >
-                {/* image - no card, no border, using image URL */}
-                <Link to={`/watch/${w.id}`}>
-                <div className={comingSoonStyles.imageContainer}>
-                  <img
-                    src={w.imgUrl}
-                    alt={w.name}
-                    className={comingSoonStyles.image}
-                    loading="lazy"
-                    onError={(e) => {
-                      // fallback: show a small transparent placeholder if URL is missing
-                      e.currentTarget.src =
-                        "data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22240%22></svg>";
-                    }}
-                  />
-                </div>
-                </Link>
-
-                {/* name */}
-                <figcaption className={comingSoonStyles.figcaption}>
-                  <Link to={`/watch/${w.id}`}>
-                  <div className={comingSoonStyles.watchName}>
-                    {w.name}
-                  </div>
+          {loading ? (
+            <div className="text-center py-10 text-gray-500">Loading arrivals...</div>
+          ) : (
+            <div className={comingSoonStyles.watchesRow}>
+              {watches.map((w) => (
+                <figure key={w.id} className={comingSoonStyles.watchItem}>
+                  <Link to={`/watches/${w.id}`}>
+                    <div className={comingSoonStyles.imageContainer}>
+                      <img
+                        src={w.imgUrl}
+                        alt={w.name}
+                        className={comingSoonStyles.image}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            "data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22240%22><rect width='100%25' height='100%25' fill='%23f3f4f6'/></svg>";
+                        }}
+                      />
+                    </div>
                   </Link>
-                  <div className={comingSoonStyles.price}>
-                    {formatINR(w.price)}
-                  </div>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+
+                  <figcaption className={comingSoonStyles.figcaption}>
+                    <Link to={`/watches/${w.id}`}>
+                      <div className={comingSoonStyles.watchName}>{w.name}</div>
+                    </Link>
+                    <div className={comingSoonStyles.price}>
+                      {formatINR(w.price)}
+                    </div>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
