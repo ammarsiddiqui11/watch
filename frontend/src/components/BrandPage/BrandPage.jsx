@@ -1,280 +1,206 @@
 // src/pages/Brand/BrandPage.jsx
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Minus } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, ShoppingCart, Minus, Plus } from "lucide-react";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useCart } from "../../CartContext";
-import { brandPageStyles } from "../../assets/dummyStyles";
+import { watchPageStyles } from "../../assets/dummyStyles"; // Using WatchPage styles for consistency
+import Navbar from "../../components/Navbar/Navbar"
 
 const API_BASE = "http://localhost:4000";
 
-// --- helper: normalize image URLs so deployed admin doesn't try to reach localhost ---
+// --- helper: normalize image URLs ---
 function normalizeImageUrl(raw) {
   if (!raw) return "";
   if (typeof raw !== "string") return "";
-
-  // derive base host for images (strip possible /api suffix)
   const baseHost = API_BASE.replace(/\/api\/?$/i, "") || API_BASE;
-
-  // Relative path -> prefix with baseHost
-  if (raw.startsWith("/")) {
-    return `${baseHost}${raw}`;
-  }
-
-  // Replace any localhost or 127.0.0.1 origin with production host
+  if (raw.startsWith("/")) return `${baseHost}${raw}`;
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(raw)) {
     return raw.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, baseHost);
   }
-
-  // If admin is served over https and raw is http, try upgrading to https (avoid mixed content)
   if (raw.startsWith("http://") && typeof window !== "undefined" && window.location.protocol === "https:") {
     try {
       const u = new URL(raw);
       u.protocol = "https:";
       return u.toString();
-    } catch (e) {
-      // fallback to raw if parsing fails
-    }
+    } catch (e) {}
   }
-
   return raw;
 }
-// --- end helper ---------------------------------------------------------------
 
 export default function BrandPage() {
   const { brandName } = useParams();
   const navigate = useNavigate();
-  const { addItem, cart, increment, decrement } = useCart();
+  const { cart, addItem, increment, decrement, removeItem } = useCart();
 
-  const [brandWatches, setBrandWatches] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [watches, setWatches] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.scrollTo(0, 0);
-      try {
-        document.documentElement && (document.documentElement.scrollTop = 0);
-        document.body && (document.body.scrollTop = 0);
-      } catch {}
-    }
-  }, []);
+  // Normalize server item -> UI shape (Matching WatchPage logic)
+  const mapServerToUI = (item) => {
+    let img = (Array.isArray(item.image) ? item.image[0] : item.image) ?? item.img ?? "";
+    img = normalizeImageUrl(img);
 
-  useEffect(() => {
-    if (!brandName) return setBrandWatches([]);
-
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const url = `${API_BASE}/api/watches/brands/${encodeURIComponent(
-          brandName
-        )}`;
-        const resp = await axios.get(url);
-        const items = resp?.data?.items ?? resp?.data ?? [];
-        const mapped = (items || []).map((it) => {
-          const id = it._id ?? it.id;
-          const rawPrice =
-            typeof it.price === "number"
-              ? it.price
-              : Number(String(it.price ?? "").replace(/[^0-9.-]+/g, "")) || 0;
-          // --- use normalizer here ---
-          const rawImg = it.image ?? it.img ?? "";
-          const img = normalizeImageUrl(rawImg);
-
-          return {
-            id: String(id),
-            image: img || null,
-            name: it.name ?? "",
-            desc: it.description ?? "",
-            priceDisplay: `₹${Number(rawPrice).toFixed(2)}`,
-            price: rawPrice,
-          };
-        });
-        if (!cancelled) setBrandWatches(mapped);
-      } catch (err) {
-        console.error("Failed to fetch brand watches:", err);
-        if (!cancelled) setError("Failed to load watches. Try again.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+    return {
+      id: item._id ?? item.id ?? String(item.sku ?? item.name ?? Math.random()).slice(2, 12),
+      name: item.name ?? "",
+      price: item.price ?? 0,
+      brand: item.brandName ?? "",
+      desc: item.description ?? item.desc ?? "",
+      img,
+      raw: item,
     };
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
   }, [brandName]);
 
-  const findInCart = (id) =>
-    cart.find(
-      (p) => String(p.id) === String(id) || String(p.productId) === String(id)
-    );
+  useEffect(() => {
+    if (!brandName) return;
 
-  if (loading) {
-    return (
-      <div className={brandPageStyles.loadingContainer}>
-        <div className="text-center">
-          <div className={brandPageStyles.loadingText}>
-            Loading watches...
-          </div>
-        </div>
-      </div>
-    );
-  }
+    let mounted = true;
+    const fetchBrandWatches = async () => {
+      setLoading(true);
+      try {
+        const url = `${API_BASE}/api/watches/brands/${encodeURIComponent(brandName)}`;
+        const resp = await axios.get(url);
+        const items = resp?.data?.items ?? resp?.data ?? [];
+        
+        if (mounted) {
+          setWatches(items.map(mapServerToUI));
+        }
+      } catch (err) {
+        console.error("Failed to fetch brand watches:", err);
+        if (mounted) toast.error("Could not fetch watches for this brand.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
-  if (error) {
-    return (
-      <div className={brandPageStyles.notFoundContainer}>
-        <div className={brandPageStyles.notFoundCard}>
-          <h2 className={brandPageStyles.notFoundTitle}>Error</h2>
-          <p className={brandPageStyles.notFoundText}>{error}</p>
-          <button
-            onClick={() => navigate(-1)}
-            className={brandPageStyles.goBackButton}
-          >
-            <ArrowLeft className={brandPageStyles.goBackIcon} /> Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
+    fetchBrandWatches();
+    return () => { mounted = false; };
+  }, [brandName]);
 
-  if (!brandWatches.length) {
-    return (
-      <div className={brandPageStyles.notFoundContainer}>
-        <div className={brandPageStyles.notFoundCard}>
-          <h2 className={brandPageStyles.notFoundTitle}>
-            No watches found
-          </h2>
-          <p className={brandPageStyles.notFoundText}>
-            This brand has no watches listed in our collection yet.
-          </p>
-          <button
-            onClick={() => navigate(-1)}
-            className={brandPageStyles.goBackButton}
-          >
-            <ArrowLeft className={brandPageStyles.goBackIcon} /> Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Robust Qty helper from WatchPage
+  const getQty = (id) => {
+    const items = Array.isArray(cart) ? cart : cart?.items ?? [];
+    const match = items.find((c) => {
+      const candidates = [c.productId, c.id, c._id];
+      return candidates.some((field) => String(field ?? "") === String(id));
+    });
+    if (!match) return 0;
+    return Number(match.qty ?? match.quantity ?? 0) || 0;
+  };
 
   return (
-    <div className={brandPageStyles.mainContainer}>
-      <div className={brandPageStyles.innerContainer}>
-        <div className={brandPageStyles.headerContainer}>
-          <div className={brandPageStyles.backButtonContainer}>
-            <button
-              onClick={() => navigate(-1)}
-              className={brandPageStyles.backButton}
-              aria-label="Go back"
-            >
-              <div className={brandPageStyles.backIconContainer}>
-                <ArrowLeft className={brandPageStyles.backIcon} />
-              </div>
-              <span className={brandPageStyles.backText}>Back</span>
-            </button>
-          </div>
-
-          <div className={brandPageStyles.titleContainer}>
-            <h1 className={brandPageStyles.title}>
-              {brandName} Collections
-            </h1>
-          </div>
+    <>
+    <Navbar/>
+    
+    <div className={watchPageStyles.container}>
+      <ToastContainer />
+      
+      {/* Brand Header Section */}
+      <div className={watchPageStyles.headerContainer}>
+        <div>
+          <button 
+            onClick={() => navigate(-1)} 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: '#64748b' }}
+          >
+            <ArrowLeft size={18} /> Back
+          </button>
+          <h1 className={watchPageStyles.headerTitle}>
+            {brandName}{" "}
+            <span className={watchPageStyles.titleAccent}>Collection</span>
+          </h1>
+          <p className={watchPageStyles.headerDescription}>
+            Exploring the finest timepieces from {brandName}.
+          </p>
         </div>
+      </div>
 
-        <div className={brandPageStyles.grid}>
-          {brandWatches.map((watch) => {
-            const inCart = findInCart(watch.id);
-            const displayedQty =
-              inCart?.qty ?? inCart?.quantity ?? inCart?.count ?? 0;
-            const targetId = inCart?.id ?? inCart?.productId ?? watch.id;
+      {loading ? (
+        <div className={watchPageStyles.loadingText}>Loading {brandName} watches…</div>
+      ) : watches.length === 0 ? (
+        <div className={watchPageStyles.noWatchesText}>No watches found for this brand.</div>
+      ) : (
+        <div className={watchPageStyles.grid}>
+          {watches.map((w) => {
+            const sid = String(w.id);
+            const qty = getQty(sid);
 
             return (
-              <div
-                key={watch.id}
-                className={brandPageStyles.card}
-              >
-                <div className={brandPageStyles.imageContainer}>
-                  {watch.image ? (
+              <div key={sid} className={watchPageStyles.card}>
+                <div className={watchPageStyles.imageContainer}>
+                  <Link to={`/watches/${sid}`}>
                     <img
-                      src={watch.image}
-                      alt={watch.name}
-                      className={brandPageStyles.image}
+                      src={w.img}
+                      alt={w.name}
+                      className={watchPageStyles.image}
+                      draggable={false}
                       onError={(e) => {
                         e.currentTarget.style.objectFit = "contain";
                         e.currentTarget.src =
                           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='Arial' font-size='16'%3EImage not available%3C/text%3E%3C/svg%3E";
                       }}
                     />
-                  ) : (
-                    <div className={brandPageStyles.noImagePlaceholder}>
-                      No image
-                    </div>
-                  )}
-                </div>
+                  </Link>
 
-                <div className={brandPageStyles.detailsContainer}>
-                  <h2 className={brandPageStyles.watchName}>
-                    {watch.name}
-                  </h2>
-                  <p className={brandPageStyles.watchDesc}>
-                    {watch.desc}
-                  </p>
-
-                  <div className={brandPageStyles.priceAndControls}>
-                    <p className={brandPageStyles.price}>
-                      {watch.priceDisplay ?? `₹${watch.price.toFixed(2)}`}
-                    </p>
-
-                    {displayedQty > 0 ? (
-                      <div className={brandPageStyles.quantityContainer}>
+                  <div className={watchPageStyles.cartControlsContainer}>
+                    {qty > 0 ? (
+                      <div className={watchPageStyles.cartQuantityControls}>
                         <button
-                          onClick={() => decrement(targetId)}
-                          aria-label={`Decrease ${watch.name} quantity`}
-                          className={brandPageStyles.quantityButton}
+                          onClick={() => {
+                            if (qty > 1) decrement(sid);
+                            else removeItem(sid);
+                          }}
+                          className={watchPageStyles.quantityButton}
                         >
-                          <Minus className={brandPageStyles.quantityIcon} />
+                          <Minus className={watchPageStyles.quantityIcon} />
                         </button>
-
-                        <div className={brandPageStyles.quantityCount}>
-                          {displayedQty}
-                        </div>
-
+                        <div className={watchPageStyles.cartQuantity}>{qty}</div>
                         <button
-                          onClick={() => increment(targetId)}
-                          aria-label={`Increase ${watch.name} quantity`}
-                          className={brandPageStyles.quantityButton}
+                          onClick={() => increment(sid)}
+                          className={watchPageStyles.quantityButton}
                         >
-                          <Plus className={brandPageStyles.quantityIcon} />
+                          <Plus className={watchPageStyles.quantityIcon} />
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() =>
                           addItem({
-                            id: watch.id,
-                            productId: watch.id,
-                            name: watch.name,
-                            price: watch.price,
-                            img: watch.image,
-                            qty: 1,
+                            id: sid,
+                            name: w.name,
+                            price: w.price,
+                            img: w.img,
                           })
                         }
-                        className={brandPageStyles.addButton}
+                        className={watchPageStyles.addToCartButton}
                       >
-                        <span>Add</span>
+                        <ShoppingCart className={watchPageStyles.addToCartIcon} />
+                        Add
                       </button>
                     )}
                   </div>
+                </div>
+
+                <div className={watchPageStyles.productInfo}>
+                  <Link to={`/watches/${sid}`}>
+                    <h3 className={watchPageStyles.productName}>{w.name}</h3>
+                  </Link>
+                  <p className={watchPageStyles.productDescription}>{w.desc}</p>
+                  <div className={watchPageStyles.productPrice}>₹{w.price}</div>
                 </div>
               </div>
             );
           })}
         </div>
-      </div>
+      )}
     </div>
+    </>
   );
+  
 }
