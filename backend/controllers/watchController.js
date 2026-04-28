@@ -122,3 +122,53 @@ export async function getWatchById(req, res) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }
+
+import watchModel from "../models/watchModel.js";
+
+// watchController.js — updateWatch
+export async function updateWatch(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, description, price, category, brandName, keepImages } = req.body;
+
+    // keepImages: string[] of existing URLs the user wants to retain
+    // sent as repeated FormData fields: fd.append("keepImages", url)
+    const kept = Array.isArray(keepImages)
+      ? keepImages
+      : keepImages
+      ? [keepImages]
+      : [];
+
+    // New files uploaded in this request
+    const newImageUrls = (req.files ?? []).map(
+      (f) => `${API_BASE}/uploads/${f.filename}`
+    );
+
+    // Final image array = kept existing + newly uploaded
+    const image = [...kept, ...newImageUrls];
+
+    if (image.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one image is required.",
+      });
+    }
+
+    const updated = await Watch.findByIdAndUpdate(
+      id,
+      { name, description, price, category, brandName, image },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Watch not found." });
+    }
+
+    return res.json({ success: true, message: "Watch updated.", data: updated });
+  } catch (err) {
+    console.error("updateWatch error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+}
+
+

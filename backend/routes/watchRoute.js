@@ -7,7 +7,8 @@ import {
   getWatches,
   deleteWatch,
   getWatchesByBrand,
-  getWatchById
+  getWatchById, 
+  updateWatch
 } from "../controllers/watchController.js";
 
 const watchRouter = express.Router();
@@ -30,5 +31,6 @@ watchRouter.get("/", getWatches);
 watchRouter.delete("/:id", deleteWatch);
 watchRouter.get('/brands/:brandName', getWatchesByBrand);
 watchRouter.get("/:id", getWatchById);
+watchRouter.put('/:id', upload.array('images', 10), updateWatch);
 
 export default watchRouter;
