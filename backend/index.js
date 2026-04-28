@@ -8,6 +8,7 @@ import userRouter from './routes/userRoute.js';
 import watchRouter from './routes/watchRoute.js';
 import cartRouter from './routes/cartRoute.js';
 import orderRouter from './routes/orderRoute.js';
+import brandRouter from "./routes/brandRoute.js";
 
 const app = express();
 const port = 4000;
@@ -26,6 +27,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads"))); // ser
 app.use("/api/watches", watchRouter);
 app.use('/api/cart', cartRouter)
 app.use("/api/orders", orderRouter)
+app.use("/api/brands", brandRouter);
 
 
 app.get('/', (req, res) => {

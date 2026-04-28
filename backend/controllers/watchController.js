@@ -1,3 +1,4 @@
+// controllers/watchController.js
 import mongoose from "mongoose";
 import Watch from "../models/watchModel.js";
 import path from "path";
@@ -8,25 +9,19 @@ const API_BASE = "http://localhost:4000";
 export async function createWatch(req, res) {
   try {
     const { name, description, price, category, brandName } = req.body;
-    
-    // 1. Initialize images as an empty array
-    let images = [];
 
-    // 2. Map through uploaded files to build the URL array
+    let images = [];
     if (req.files && req.files.length > 0) {
       images = req.files.map(file => `${API_BASE}/uploads/${file.filename}`);
-    } 
-
-    // 3. Fallback to req.body.images if provided as a pre-existing list/string
+    }
     if (images.length === 0 && req.body.images) {
       images = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
     }
 
-    // Validation
     if (!name || !description || !price || images.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "name, description, price and at least one image are required" 
+      return res.status(400).json({
+        success: false,
+        message: "name, description, price and at least one image are required",
       });
     }
 
@@ -37,7 +32,7 @@ export async function createWatch(req, res) {
       price,
       category,
       brandName,
-      image: images, // Save the array of strings
+      image: images,
     });
 
     const saved = await doc.save();
@@ -52,7 +47,7 @@ export async function getWatches(req, res) {
   try {
     const { category, sort = "-createdAt", page = 1, limit = 12 } = req.query;
     const filter = {};
-    
+
     if (typeof category === "string") {
       const cat = category.trim().toLowerCase();
       if (cat === "men" || cat === "women") filter.category = cat;
@@ -80,16 +75,21 @@ export async function deleteWatch(req, res) {
     const w = await Watch.findById(id);
     if (!w) return res.status(404).json({ success: false, message: "Watch not found" });
 
-    if (w.image && typeof w.image === "string") {
-      const normalized = w.image.startsWith("/") ? w.image.slice(1) : w.image;
-      if (normalized.startsWith("uploads/")) {
-        const filename = normalized.replace(/^uploads\//, "");
-        const filepath = path.join(process.cwd(), "uploads", filename);
-        fs.unlink(filepath, (err) => {
-          if (err) console.warn("Failed to unlink image file", filepath, err?.message || err);
-        });
+    // Delete all associated image files
+    const imageArr = Array.isArray(w.image) ? w.image : w.image ? [w.image] : [];
+    imageArr.forEach((imgUrl) => {
+      try {
+        const filename = imgUrl.split("/uploads/")[1];
+        if (filename) {
+          const filepath = path.join(process.cwd(), "uploads", filename);
+          fs.unlink(filepath, (err) => {
+            if (err) console.warn("Failed to unlink:", filepath);
+          });
+        }
+      } catch (e) {
+        console.warn("Error deleting image file:", e);
       }
-    }
+    });
 
     await Watch.findByIdAndDelete(id);
     return res.json({ success: true, message: "Watch deleted" });
@@ -99,10 +99,25 @@ export async function deleteWatch(req, res) {
   }
 }
 
+// Matches by brandName slug — e.g. /brands/audemars-piguet
+// Watch.brandName is stored as slugified lowercase (set by AddPage)
 export async function getWatchesByBrand(req, res) {
   try {
-    const brandName = req.params.brandName;
-    const items = await Watch.find({ brandName }).sort({ createdAt: -1}).lean();
+    const slug = req.params.brandName?.toLowerCase().trim();
+    if (!slug) return res.status(400).json({ success: false, message: "brandName is required" });
+
+    // Try exact match first, then slug match
+    let items = await Watch.find({ brandName: slug }).sort({ createdAt: -1 }).lean();
+
+    if (items.length === 0) {
+      // Fallback: match brands stored with spaces or different casing
+      items = await Watch.find({
+        brandName: { $regex: new RegExp(`^${slug.replace(/-/g, "[\\s-]")}$`, "i") },
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
     return res.json({ success: true, items });
   } catch (err) {
     console.error("getWatchesByBrand error:", err);
@@ -123,28 +138,21 @@ export async function getWatchById(req, res) {
   }
 }
 
-import watchModel from "../models/watchModel.js";
-
-// watchController.js — updateWatch
 export async function updateWatch(req, res) {
   try {
     const { id } = req.params;
     const { name, description, price, category, brandName, keepImages } = req.body;
 
-    // keepImages: string[] of existing URLs the user wants to retain
-    // sent as repeated FormData fields: fd.append("keepImages", url)
     const kept = Array.isArray(keepImages)
       ? keepImages
       : keepImages
       ? [keepImages]
       : [];
 
-    // New files uploaded in this request
     const newImageUrls = (req.files ?? []).map(
       (f) => `${API_BASE}/uploads/${f.filename}`
     );
 
-    // Final image array = kept existing + newly uploaded
     const image = [...kept, ...newImageUrls];
 
     if (image.length === 0) {
@@ -170,5 +178,3 @@ export async function updateWatch(req, res) {
     return res.status(500).json({ success: false, message: "Server error." });
   }
 }
-
-
