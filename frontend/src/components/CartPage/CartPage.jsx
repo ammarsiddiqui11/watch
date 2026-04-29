@@ -1,439 +1,453 @@
 // src/pages/CartPage.jsx
 import React, { useState, useEffect } from "react";
-import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag } from "lucide-react";
+import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag, ChevronRight, CheckCircle2, RefreshCw, MapPin, Phone, Mail, CreditCard, FileText } from "lucide-react";
 import { useCart } from "../../CartContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
-import { cartPageStyles } from "../../assets/dummyStyles";
 
 const API_BASE = "http://localhost:4000";
 
-// --- helper: normalize image URLs so deployed frontend doesn't try to reach localhost ---
 function normalizeImageUrl(raw) {
-  if (!raw) return "";
-  if (typeof raw !== "string") return "";
-
-  // derive base host for images (strip possible /api suffix)
+  if (!raw || typeof raw !== "string") return "";
   const baseHost = API_BASE.replace(/\/api\/?$/i, "") || API_BASE;
-
-  // Relative path -> prefix with baseHost
-  if (raw.startsWith("/")) {
-    return `${baseHost}${raw}`;
-  }
-
-  // Replace any localhost or 127.0.0.1 origin with production host
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(raw)) {
-    return raw.replace(
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i,
-      baseHost
-    );
-  }
-
-  // If frontend is served over https and raw is http, try upgrading to https (avoid mixed content)
-  if (
-    raw.startsWith("http://") &&
-    typeof window !== "undefined" &&
-    window.location.protocol === "https:"
-  ) {
-    try {
-      const u = new URL(raw);
-      u.protocol = "https:";
-      return u.toString();
-    } catch (e) {
-      // fallback to raw if parsing fails
-    }
-  }
-
+  if (raw.startsWith("/")) return `${baseHost}${raw}`;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(raw))
+    return raw.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, baseHost);
   return raw;
 }
-// --- end helper ---------------------------------------------------------------
 
-function CartProduct({ item }) {
+const STEPS = ["Cart", "Details", "Review", "Placed"];
+
+// ── Step Indicator ─────────────────────────────────────────────────────────
+function StepBar({ step }) {
+  return (
+    <div className="flex items-center justify-center mb-8">
+      {STEPS.map((label, i) => (
+        <React.Fragment key={label}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+              i < step ? "bg-slate-900 text-white" :
+              i === step ? "bg-slate-900 text-white ring-4 ring-slate-200" :
+              "bg-slate-100 text-slate-400"
+            }`}>
+              {i < step ? <CheckCircle2 size={16} /> : i + 1}
+            </div>
+            <span className={`text-[11px] font-semibold ${i <= step ? "text-slate-700" : "text-slate-400"}`}>
+              {label}
+            </span>
+          </div>
+          {i < STEPS.length - 1 && (
+            <div className={`h-0.5 w-12 sm:w-20 mx-1 mb-5 transition-all ${i < step ? "bg-slate-900" : "bg-slate-200"}`} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ── Cart Item ──────────────────────────────────────────────────────────────
+function CartItem({ item }) {
   const { increment, decrement, removeItem } = useCart();
-  const [localQty, setLocalQty] = useState(item.qty ?? 1);
+  const [localQty, setLocalQty] = useState(Number(item.qty ?? 1));
 
-  useEffect(() => {
-    setLocalQty(Number(item.qty ?? item.quantity ?? 1));
-  }, [item.qty, item.quantity]);
-
-  const onInc = () => {
-    setLocalQty((q) => (Number.isFinite(q) ? q + 1 : 1));
-    increment(item.id);
-  };
-
-  const onDec = () => {
-    const currentQty = item.qty ?? localQty;
-    if (currentQty <= 1) {
-      removeItem(item.id);
-      return;
-    }
-    setLocalQty((q) => (Number.isFinite(q) ? q - 1 : currentQty - 1));
-    decrement(item.id);
-  };
-
-  // normalize when rendering so deployed site doesn't attempt to fetch localhost
-  const imgSrc = normalizeImageUrl(item.img);
+  useEffect(() => { setLocalQty(Number(item.qty ?? item.quantity ?? 1)); }, [item.qty, item.quantity]);
 
   return (
-    <div className={cartPageStyles.cartItemCard}>
-      <div className={cartPageStyles.cartItemImageContainer}>
+    <div className="flex gap-4 py-4 border-b border-slate-100 last:border-0">
+      <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
         <img
-          src={imgSrc}
+          src={normalizeImageUrl(item.img)}
           alt={item.name}
-          className={cartPageStyles.cartItemImage}
-          onError={(e) => {
-            e.currentTarget.style.objectFit = "contain";
-            e.currentTarget.src =
-              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='Arial' font-size='16'%3EImage not available%3C/text%3E%3C/svg%3E";
-          }}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='100%25' height='100%25' fill='%23f1f5f9'/%3E%3C/svg%3E"; }}
         />
       </div>
-      <div className={cartPageStyles.cartItemContent}>
-        <h3 className={cartPageStyles.cartItemName}>{item.name}</h3>
-        <p className={cartPageStyles.cartItemPrice}>{item.price}</p>
-
-        <div className={cartPageStyles.quantityContainer}>
-          <div className={cartPageStyles.quantityControls}>
-            <button
-              onClick={onDec}
-              className={cartPageStyles.quantityButton}
-              aria-label={`Decrease ${item.name} quantity`}
-            >
-              <Minus size={16} />
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-slate-800 text-sm truncate">{item.name}</h3>
+        <p className="text-slate-500 text-sm font-medium mt-0.5">₹{Number(item.price).toLocaleString("en-IN")}</p>
+        <div className="flex items-center gap-3 mt-2">
+          <div className="inline-flex items-center gap-2 border border-slate-200 rounded-full px-3 py-1 bg-white">
+            <button onClick={() => { if (localQty <= 1) removeItem(item.id); else { setLocalQty(q => q - 1); decrement(item.id); } }} className="text-slate-500 hover:text-slate-900 transition">
+              <Minus size={13} />
             </button>
-
-            <span className={cartPageStyles.quantityText}>{localQty}</span>
-
-            <button
-              onClick={onInc}
-              className={cartPageStyles.quantityButton}
-              aria-label={`Increase ${item.name} quantity`}
-            >
-              <Plus size={16} />
+            <span className="text-sm font-bold w-4 text-center">{localQty}</span>
+            <button onClick={() => { setLocalQty(q => q + 1); increment(item.id); }} className="text-slate-500 hover:text-slate-900 transition">
+              <Plus size={13} />
             </button>
           </div>
-
-          <button
-            onClick={() => removeItem(item.id)}
-            className={cartPageStyles.removeButton}
-            aria-label={`Remove ${item.name}`}
-          >
-            <Trash2 size={18} />
+          <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600 transition p-1">
+            <Trash2 size={14} />
           </button>
+        </div>
+      </div>
+      <div className="text-sm font-bold text-slate-900 shrink-0">
+        ₹{(Number(item.price) * localQty).toLocaleString("en-IN")}
+      </div>
+    </div>
+  );
+}
+
+// ── Order Summary Sidebar ──────────────────────────────────────────────────
+function OrderSummary({ cart, totalPrice }) {
+  const tax = totalPrice * 0.08;
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sticky top-6">
+      <h2 className="font-bold text-slate-900 mb-4">Order Summary</h2>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between text-slate-500">
+          <span>Subtotal ({cart.length} item{cart.length !== 1 ? "s" : ""})</span>
+          <span>₹{totalPrice.toLocaleString("en-IN")}</span>
+        </div>
+        <div className="flex justify-between text-slate-500">
+          <span>Shipping</span>
+          <span className="text-green-600 font-semibold">Free</span>
+        </div>
+        <div className="flex justify-between text-slate-500">
+          <span>Tax (8%)</span>
+          <span>₹{tax.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-slate-900 text-base pt-3 border-t border-slate-100 mt-3">
+          <span>Total</span>
+          <span>₹{(totalPrice + tax).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       </div>
     </div>
   );
 }
 
+// ── Input helper ───────────────────────────────────────────────────────────
+function Field({ icon: Icon, label, required, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+        {Icon && <Icon size={12} />} {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-900 outline-none transition placeholder:text-slate-300";
+
+// ── Main CartPage ──────────────────────────────────────────────────────────
 export default function CartPage() {
-  const {
-    cart,
-    increment,
-    decrement,
-    removeItem,
-    clearCart,
-    totalItems,
-    totalPrice,
-  } = useCart();
+  const { cart, clearCart, totalPrice } = useCart();
+  const navigate = useNavigate();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [note, setNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [step, setStep] = useState(0); // 0=cart, 1=details, 2=review, 3=placed
+  const [form, setForm] = useState({ name: "", email: "", mobile: "", address: "", note: "", paymentMethod: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState(null);
 
-  const handleMobileChange = (e) => {
-    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-    setMobile(digitsOnly);
-  };
+  const setField = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
 
   const isFormValid = () => {
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !address.trim() ||
-      !mobile.trim() ||
-      !paymentMethod.trim()
-    )
-      return false;
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    const phoneOk = /^[0-9]{10}$/.test(mobile.replace(/\s+/g, ""));
-    return emailOk && phoneOk;
+    const { name, email, mobile, address, paymentMethod } = form;
+    if (!name.trim() || !email.trim() || !mobile.trim() || !address.trim() || !paymentMethod) return false;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+    if (!/^\d{10}$/.test(mobile.replace(/\s/g, ""))) return false;
+    return true;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!isFormValid()) {
-      toast.error("Please fill all required fields correctly.", {
-        position: "top-right",
-      });
-      return;
-    }
-    if (!cart.length) {
-      toast.error("Your cart is empty.", { position: "top-right" });
-      return;
-    }
-
+  const submitOrder = async () => {
     const token = localStorage.getItem("authToken");
-    if (!token) {
-      toast.error("Please log in to place the order.", {
-        position: "top-right",
-      });
-      return;
-    }
-
-    const itemsPayload = cart.map((it) => ({
-      productId: it.productId ?? it.id,
-      name: it.name,
-      img: normalizeImageUrl(it.img), // normalize before sending (optional but consistent)
-      price: Number(it.price ?? 0),
-      qty: Number(it.qty ?? it.quantity ?? 1),
-    }));
-
-    const body = {
-      name,
-      email,
-      phoneNumber: mobile,
-      address,
-      notes: note,
-      paymentMethod,
-      items: itemsPayload,
-    };
+    if (!token) { toast.error("Please log in to place an order."); return; }
 
     setSubmitting(true);
     try {
-      const res = await axios.post(`${API_BASE}/api/orders`, body, {
+      const payload = {
+        name: form.name,
+        email: form.email,
+        phoneNumber: form.mobile,
+        address: form.address,
+        notes: form.note,
+        paymentMethod: form.paymentMethod,
+        items: cart.map((it) => ({
+          productId: it.productId ?? it.id,
+          name: it.name,
+          img: normalizeImageUrl(it.img),
+          price: Number(it.price ?? 0),
+          qty: Number(it.qty ?? it.quantity ?? 1),
+          description: it.description ?? "",
+        })),
+      };
+
+      const res = await axios.post(`${API_BASE}/api/orders`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res?.data?.success) {
         const checkoutUrl = res.data.checkoutUrl ?? null;
-        clearCart();
         if (checkoutUrl) {
-          toast.info("Redirecting to payment...", { position: "top-right" });
+          clearCart();
           window.location.href = checkoutUrl;
           return;
         }
-        setName("");
-        setEmail("");
-        setAddress("");
-        setMobile("");
-        setNote("");
-        setPaymentMethod("");
-        toast.success("Order placed successfully.", { position: "top-right" });
+        setPlacedOrder(res.data.order);
+        clearCart();
+        setStep(3);
         return;
       }
-
-      toast.error(res?.data?.message ?? "Failed to create order", {
-        position: "top-right",
-      });
+      toast.error(res?.data?.message ?? "Failed to create order.");
     } catch (err) {
       const status = err?.response?.status;
-      const serverMsg = err?.response?.data?.message;
-      if (status === 401) {
-        toast.error("Authentication error — please log in again.", {
-          position: "top-right",
-        });
-      } else {
-        toast.error(serverMsg ?? "Failed to create order. Try again later.", {
-          position: "top-right",
-        });
-      }
+      if (status === 401) toast.error("Session expired — please log in again.");
+      else toast.error(err?.response?.data?.message ?? "Failed to place order. Try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!cart.length) {
-    return (
-      <>
-        <ToastContainer />
-        <div className={cartPageStyles.emptyCartContainer}>
-          <div className={cartPageStyles.emptyCartCard}>
-            <ShoppingBag size={48} className={cartPageStyles.emptyCartIcon} />
-            <h2 className={cartPageStyles.emptyCartTitle}>
-              Your cart is empty
-            </h2>
-            <p className={cartPageStyles.emptyCartText}>
-              Looks like you haven't added any watches to your cart yet.
-            </p>
-            <Link to="/watches" className={cartPageStyles.emptyCartButton}>
+  // ── Step 0: Cart ───────────────────────────────────────────────────────
+  if (step === 0) {
+    if (!cart.length) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="text-center space-y-4">
+            <ShoppingBag size={56} className="mx-auto text-slate-300" />
+            <h2 className="text-xl font-bold text-slate-800">Your cart is empty</h2>
+            <p className="text-slate-400 text-sm">Add some watches to get started.</p>
+            <Link to="/watches" className="inline-block mt-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-semibold text-sm hover:bg-slate-800 transition">
               Browse Watches
             </Link>
           </div>
         </div>
-      </>
-    );
-  }
+      );
+    }
 
-  return (
-    <>
-      <ToastContainer />
-      <div className={cartPageStyles.pageContainer}>
-        <div className={cartPageStyles.maxWidthContainer}>
-          <div className={cartPageStyles.headerContainer}>
-            <div className={cartPageStyles.backButtonContainer}>
-              <Link
-                to="/watches"
-                className={cartPageStyles.backLink}
-                aria-label="Back to watches"
+    return (
+      <div className="min-h-screen bg-slate-50 py-8 px-4">
+        <ToastContainer />
+        <div className="max-w-4xl mx-auto">
+          <Link to="/watches" className="flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-medium mb-6 transition w-fit">
+            <ArrowLeft size={16} /> Back to Watches
+          </Link>
+          <StepBar step={0} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <h2 className="font-bold text-slate-900 mb-2">Your Cart</h2>
+              <div>{cart.map((item) => <CartItem key={item.id} item={item} />)}</div>
+            </div>
+            <div className="space-y-4">
+              <OrderSummary cart={cart} totalPrice={totalPrice} />
+              <button
+                onClick={() => setStep(1)}
+                className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
               >
-                <div className={cartPageStyles.backIconContainer}>
-                  <ArrowLeft size={20} />
-                </div>
-                <span className={cartPageStyles.backText}>Back to Watches</span>
-              </Link>
-            </div>
-
-            <h1 className={cartPageStyles.cartTitle}>Your Shopping Cart</h1>
-
-            <button
-              onClick={clearCart}
-              className={cartPageStyles.clearCartButton}
-              aria-label="Clear cart"
-            >
-              <Trash2 size={18} /> Clear Cart
-            </button>
-          </div>
-
-          <div className={cartPageStyles.mainGrid}>
-            <div className={cartPageStyles.leftColumn}>
-              <div className={cartPageStyles.formContainer}>
-                <h2 className={cartPageStyles.formTitle}>Enter your details</h2>
-                <p className={cartPageStyles.formSubtitle}>
-                  All fields are required.
-                </p>
-
-                <form onSubmit={handleSubmit} className={cartPageStyles.form}>
-                  <div className={cartPageStyles.inputGrid}>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Full name"
-                      className={cartPageStyles.inputBase}
-                      required
-                      aria-label="Full name"
-                    />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Email address"
-                      className={cartPageStyles.inputBase}
-                      required
-                      aria-label="Email"
-                    />
-                  </div>
-
-                  <input
-                    type="text"
-                    value={mobile}
-                    onChange={handleMobileChange}
-                    placeholder="Mobile number (10 digits)"
-                    className={cartPageStyles.inputBase}
-                    required
-                    aria-label="Mobile number"
-                  />
-
-                  <textarea
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Address"
-                    rows={3}
-                    className={cartPageStyles.textareaBase}
-                    required
-                    aria-label="Address"
-                  />
-
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className={cartPageStyles.selectBase}
-                    required
-                    aria-label="Payment Method"
-                  >
-                    <option value="">Select Payment Method</option>
-                    <option value="Online">Online</option>
-                    <option value="Cash on Delivery">Cash on Delivery</option>
-                  </select>
-
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Message / delivery instructions (optional)"
-                    rows={2}
-                    className={cartPageStyles.textareaBase}
-                    aria-label="Message"
-                  />
-
-                  <div className={cartPageStyles.formButtonsContainer}>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className={cartPageStyles.submitButton}
-                    >
-                      {submitting ? "Processing…" : "Submit Order"}
-                    </button>
-
-                    <Link
-                      to="/"
-                      className={cartPageStyles.continueShoppingButton}
-                    >
-                      Continue Shopping
-                    </Link>
-                  </div>
-                </form>
-              </div>
-
-              <div className={cartPageStyles.cartItemsGrid}>
-                {cart.map((item) => (
-                  <CartProduct key={item.id} item={item} />
-                ))}
-              </div>
-            </div>
-
-            <div className={cartPageStyles.orderSummaryContainer}>
-              <h2 className={cartPageStyles.orderSummaryTitle}>
-                Order Summary
-              </h2>
-
-              <div className={cartPageStyles.orderSummaryContent}>
-                <div className={cartPageStyles.summaryRow}>
-                  <span className={cartPageStyles.summaryLabel}>
-                    Subtotal ({totalItems} items)
-                  </span>
-                  <span className={cartPageStyles.summaryValue}>
-                    ₹{totalPrice.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className={cartPageStyles.summaryRow}>
-                  <span className={cartPageStyles.summaryLabel}>Shipping</span>
-                  <span className={cartPageStyles.summaryValue}>Free</span>
-                </div>
-
-                <div className={cartPageStyles.summaryRow}>
-                  <span className={cartPageStyles.summaryLabel}>Tax (8%)</span>
-                  <span className={cartPageStyles.summaryValue}>
-                    ₹{(totalPrice * 0.08).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              <div className={cartPageStyles.totalContainer}>
-                <span>Total</span>
-                <span>₹{(totalPrice * 1.08).toFixed(2)}</span>
-              </div>
+                Proceed to Details <ChevronRight size={16} />
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </>
+    );
+  }
+
+  // ── Step 1: Details ────────────────────────────────────────────────────
+  if (step === 1) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-8 px-4">
+        <ToastContainer />
+        <div className="max-w-4xl mx-auto">
+          <button onClick={() => setStep(0)} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-medium mb-6 transition">
+            <ArrowLeft size={16} /> Back
+          </button>
+          <StepBar step={1} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+              <div>
+                <h2 className="font-bold text-slate-900">Delivery Details</h2>
+                <p className="text-slate-400 text-sm mt-0.5">All fields marked * are required</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field icon={User} label="Full Name" required>
+                  <input value={form.name} onChange={setField("name")} placeholder="John Doe" className={inputCls} />
+                </Field>
+                <Field icon={Mail} label="Email" required>
+                  <input type="email" value={form.email} onChange={setField("email")} placeholder="john@example.com" className={inputCls} />
+                </Field>
+              </div>
+
+              <Field icon={Phone} label="Mobile Number" required>
+                <input
+                  value={form.mobile}
+                  onChange={(e) => setForm((p) => ({ ...p, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                  placeholder="10-digit mobile number"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field icon={MapPin} label="Delivery Address" required>
+                <textarea value={form.address} onChange={setField("address")} rows={3} placeholder="House no., Street, City, State, PIN" className={`${inputCls} resize-none`} />
+              </Field>
+
+              <Field icon={CreditCard} label="Payment Method" required>
+                <select value={form.paymentMethod} onChange={setField("paymentMethod")} className={inputCls}>
+                  <option value="">Select payment method</option>
+                  <option value="Online">Online Payment (Stripe)</option>
+                  <option value="Cash on Delivery">Cash on Delivery</option>
+                </select>
+              </Field>
+
+              <Field icon={FileText} label="Order Notes">
+                <textarea value={form.note} onChange={setField("note")} rows={2} placeholder="Special instructions, delivery preferences… (optional)" className={`${inputCls} resize-none`} />
+              </Field>
+            </div>
+
+            <div className="space-y-4">
+              <OrderSummary cart={cart} totalPrice={totalPrice} />
+              <button
+                onClick={() => {
+                  if (!isFormValid()) { toast.error("Please fill all required fields correctly."); return; }
+                  setStep(2);
+                }}
+                className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+              >
+                Review Order <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 2: Review ─────────────────────────────────────────────────────
+  if (step === 2) {
+    const tax = totalPrice * 0.08;
+    return (
+      <div className="min-h-screen bg-slate-50 py-8 px-4">
+        <ToastContainer />
+        <div className="max-w-4xl mx-auto">
+          <button onClick={() => setStep(1)} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-medium mb-6 transition">
+            <ArrowLeft size={16} /> Edit Details
+          </button>
+          <StepBar step={2} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              {/* Delivery Info */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h3 className="font-bold text-slate-900 mb-4">Delivery Information</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {[
+                    { label: "Name", value: form.name },
+                    { label: "Email", value: form.email },
+                    { label: "Mobile", value: form.mobile },
+                    { label: "Payment", value: form.paymentMethod },
+                  ].map((r) => (
+                    <div key={r.label} className="bg-slate-50 rounded-xl px-4 py-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">{r.label}</div>
+                      <div className="font-semibold text-slate-800 mt-0.5">{r.value}</div>
+                    </div>
+                  ))}
+                  <div className="sm:col-span-2 bg-slate-50 rounded-xl px-4 py-3">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Address</div>
+                    <div className="font-semibold text-slate-800 mt-0.5">{form.address}</div>
+                  </div>
+                  {form.note && (
+                    <div className="sm:col-span-2 bg-slate-50 rounded-xl px-4 py-3">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Notes</div>
+                      <div className="text-slate-700 mt-0.5">{form.note}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h3 className="font-bold text-slate-900 mb-4">Items ({cart.length})</h3>
+                {cart.map((item) => (
+                  <div key={item.id} className="flex gap-3 items-center py-3 border-b border-slate-100 last:border-0">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                      <img src={normalizeImageUrl(item.img)} alt={item.name} className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-slate-400">Qty: {item.qty ?? 1}</p>
+                    </div>
+                    <p className="font-bold text-slate-900 text-sm">
+                      ₹{(Number(item.price) * Number(item.qty ?? 1)).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <OrderSummary cart={cart} totalPrice={totalPrice} />
+
+              {form.paymentMethod === "Cash on Delivery" && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                  <p className="font-bold mb-1">Cash on Delivery</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">Please keep ₹{(totalPrice + tax).toLocaleString("en-IN", { minimumFractionDigits: 2 })} ready at the time of delivery.</p>
+                </div>
+              )}
+
+              <button
+                onClick={submitOrder}
+                disabled={submitting}
+                className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-lg shadow-slate-200 disabled:opacity-60"
+              >
+                {submitting ? <><RefreshCw size={15} className="animate-spin" /> Processing…</> : <><CheckCircle2 size={15} /> Place Order</>}
+              </button>
+              <p className="text-center text-xs text-slate-400">
+                A confirmation email will be sent to <strong>{form.email}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 3: Placed ─────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center py-16 px-4">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+          <CheckCircle2 size={40} className="text-green-500" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Order Placed!</h2>
+          <p className="text-slate-500 text-sm mt-2">
+            Thank you, <strong>{placedOrder?.name ?? form.name}</strong>! Your order has been received.
+          </p>
+        </div>
+
+        {placedOrder && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Order ID</span>
+              <span className="font-mono font-bold text-slate-800 text-xs">{placedOrder.orderId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Payment</span>
+              <span className="font-semibold text-slate-800">{placedOrder.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Total</span>
+              <span className="font-bold text-slate-900">₹{Number(placedOrder.finalAmount).toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+        )}
+
+        <p className="text-slate-400 text-xs">
+          A confirmation email has been sent to <strong>{placedOrder?.email ?? form.email}</strong>
+        </p>
+
+        <div className="flex gap-3">
+          <Link to="/my-orders" className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition text-center">
+            Track Orders
+          </Link>
+          <Link to="/watches" className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition text-center">
+            Continue Shopping
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

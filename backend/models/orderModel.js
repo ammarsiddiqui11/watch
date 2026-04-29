@@ -9,7 +9,7 @@ const itemSchema = new Schema(
     img: { type: String, default: null },
     price: { type: Number, required: true, min: 0 },
     qty: { type: Number, required: true, default: 1, min: 1 },
-    description: { type: String, required: true },
+    description: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -32,7 +32,7 @@ const orderSchema = new Schema(
     sessionId: { type: String },
     paymentIntentId: { type: String },
     notes: { type: String },
-    orderStatus: { type: String, enum: ["Pending", "Completed", "Confirmed", "Cancelled"], default: "Pending" },
+    orderStatus: { type: String, enum: ["Pending", "Confirmed", "Shipped", "Completed", "Cancelled"], default: "Pending" },
   },
   { timestamps: true }
 );

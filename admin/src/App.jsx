@@ -10,6 +10,7 @@ const App = () => {
   return (
     <>
       <Routes>
+        
         <Route path="/" element={<List />} /> {/* <- root */}
         <Route path="/add" element={<Add />} />
         <Route path="/list" element={<List />} />
