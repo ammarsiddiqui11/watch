@@ -1,246 +1,206 @@
-// Navbar.jsx
-import React, { useState, useEffect } from "react";
+// src/components/Navbar/Navbar.jsx
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Clock, BaggageClaim, User, Menu, X } from "lucide-react";
+import { Clock, ShoppingBag, User, Menu, X, ChevronDown, Package, LogOut, Settings } from "lucide-react";
 import { useCart } from "../../CartContext";
-import { navbarStyles } from "../../assets/dummyStyles";
 
-const navItems = [
-  { name: "Home", href: "/" },
-  { name: "Watches", href: "/watches" },
-  { name: "Contact", href: "/contact" },
-  { name: "My Orders", href: "/my-orders" },
+const NAV_ITEMS = [
+  { name: "Home",     href: "/" },
+  { name: "Watches",  href: "/watches" },
+  { name: "Contact",  href: "/contact" },
 ];
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const [active, setActive] = useState(location.pathname || "/");
-  const { totalItems, clearCart, reloadCart } = useCart();
+  const { totalItems, clearCart } = useCart();
+  const userMenuRef = useRef(null);
 
-  const [loggedIn, setLoggedIn] = useState(() => {
+  const [user, setUser] = useState(() => {
     try {
-      return (
-        localStorage.getItem("isLoggedIn") === "true" ||
-        !!localStorage.getItem("authToken")
-      );
-    } catch {
-      return false;
-    }
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
   });
 
-  useEffect(() => setActive(location.pathname || "/"), [location]);
+  const loggedIn = !!(user || localStorage.getItem("authToken"));
 
+  // Close user menu on outside click
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === "isLoggedIn" || e.key === "authToken") {
-        try {
-          const isNowLoggedIn =
-            localStorage.getItem("isLoggedIn") === "true" ||
-            !!localStorage.getItem("authToken");
-
-          setLoggedIn(isNowLoggedIn);
-        } catch {
-          setLoggedIn(false);
-        }
+    const handler = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
       }
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [loggedIn]);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
+  // Sync on storage change (e.g. after login in another tab)
   useEffect(() => {
-    // Load cart on mount and whenever loggedIn becomes true
-    try {
-      reloadCart();
-    } catch (e) {
-      // ignore
-    }
-    // run once on mount and when loggedIn changes
-  }, [loggedIn]);
+    const handler = () => {
+      try {
+        const raw = localStorage.getItem("user");
+        setUser(raw ? JSON.parse(raw) : null);
+      } catch { setUser(null); }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
-  const handleNavClick = (href) => {
-    setActive(href);
-    setOpen(false);
-  };
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); setUserMenuOpen(false); }, [location]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem("isLoggedIn");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("authtoken");
-      localStorage.removeItem("user");
-      localStorage.removeItem("cart");
-      localStorage.removeItem("cartItems");
-    } catch (e) {}
-    // ensure cart is emptied in memory/context
-    try {
-      clearCart && clearCart();
-    } catch (e) {}
-    setLoggedIn(false);
-    setOpen(false);
+    ["authToken", "authtoken", "user", "isLoggedIn", "cart", "cartItems"].forEach((k) => {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
+    try { clearCart?.(); } catch (_) {}
+    setUser(null);
+    setUserMenuOpen(false);
     navigate("/");
   };
 
+  const isActive = (href) =>
+    href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
+
   return (
-    <header className={navbarStyles.header}>
-      <nav
-        className={navbarStyles.nav}
-        role="navigation"
-        aria-label="Main"
-      >
-        <div className={navbarStyles.container}>
-          <div className={navbarStyles.brandContainer}>
-            <div className={navbarStyles.logoContainer}>
-              <Clock className={navbarStyles.logoIcon} />
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-16">
+        <div className="flex items-center justify-between h-16">
+
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center">
+              <Clock size={16} className="text-white" />
             </div>
-            <Link
-              to="/"
-              onClick={() => handleNavClick("/")}
-              className={navbarStyles.logoLink}
-            >
-              <span
-                className={navbarStyles.logoText}
-                style={navbarStyles.logoTextStyle}
-              >
-                ChronoElite
-              </span>
-            </Link>
-          </div>
+            <span className="text-lg font-bold text-slate-900 tracking-tight"
+              style={{ fontFamily: "'Playfair Display', serif" }}>
+              ChronoElite
+            </span>
+          </Link>
 
-          <div className={navbarStyles.desktopNav}>
-            {navItems.map((item) => {
-              const isActive = active === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => handleNavClick(item.href)}
-                  className={`${navbarStyles.navItemBase} ${
-                    isActive
-                      ? navbarStyles.navItemActive
-                      : navbarStyles.navItemInactive
-                  }`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <span>{item.name}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`${navbarStyles.activeIndicator} ${
-                      isActive
-                        ? navbarStyles.activeIndicatorVisible
-                        : navbarStyles.activeIndicatorHidden
-                    }`}
-                  />
-                </Link>
-              );
-            })}
-          </div>
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {NAV_ITEMS.map((item) => (
+              <Link key={item.name} to={item.href}
+                className={`relative px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+                  isActive(item.href)
+                    ? "text-slate-900 bg-slate-100"
+                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                }`}>
+                {item.name}
+              </Link>
+            ))}
+          </nav>
 
-          <div className={navbarStyles.rightActions}>
-            <Link
-              to="/cart"
-              aria-label="Cart"
-              className={navbarStyles.cartLink}
-            >
-              <BaggageClaim className={navbarStyles.cartIcon} />
+          {/* Right actions */}
+          <div className="flex items-center gap-2">
+            {/* Cart */}
+            <Link to="/cart" aria-label="Cart"
+              className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-slate-100 transition-colors text-slate-600">
+              <ShoppingBag size={20} />
               {totalItems > 0 && (
-                <span
-                  className={navbarStyles.cartBadge}
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  {totalItems}
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
+                  {totalItems > 9 ? "9+" : totalItems}
                 </span>
               )}
             </Link>
 
-            {!loggedIn ? (
-              <Link
-                to="/login"
-                className={navbarStyles.accountLink}
-              >
-                <User className={navbarStyles.accountIcon} />
-                <span className={navbarStyles.accountText}>Account</span>
-              </Link>
-            ) : (
-              <button
-                onClick={handleLogout}
-                className={navbarStyles.accountLink}
-                aria-label="Logout"
-              >
-                <User className={navbarStyles.accountIcon} />
-                <span className={navbarStyles.accountText}>Logout</span>
-              </button>
-            )}
+            {/* User menu — desktop */}
+            {loggedIn ? (
+              <div className="hidden md:block relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen((p) => !p)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-bold">
+                    {user?.name?.[0]?.toUpperCase() ?? <User size={13} />}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700 max-w-[80px] truncate">
+                    {user?.name?.split(" ")[0] ?? "Account"}
+                  </span>
+                  <ChevronDown size={13} className={`text-slate-400 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
+                </button>
 
-            <div className={navbarStyles.mobileMenuButton}>
-              <button
-                onClick={() => setOpen(!open)}
-                aria-label="Open menu"
-                aria-expanded={open}
-                className={navbarStyles.menuButton}
-              >
-                {open ? (
-                  <X className={navbarStyles.menuIcon} />
-                ) : (
-                  <Menu className={navbarStyles.menuIcon} />
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {open && (
-          <div className={navbarStyles.mobileMenu}>
-            <div className={navbarStyles.mobileMenuContainer}>
-              {navItems.map((item) => {
-                const isActive = active === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    onClick={() => handleNavClick(item.href)}
-                    className={`${navbarStyles.mobileNavItemBase} ${
-                      isActive
-                        ? navbarStyles.mobileNavItemActive
-                        : navbarStyles.mobileNavItemInactive
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <span className={navbarStyles.mobileNavItemText}>{item.name}</span>
-                  </Link>
-                );
-              })}
-
-              <div className={navbarStyles.mobileAccountContainer}>
-                {!loggedIn ? (
-                  <Link
-                    to="/login"
-                    onClick={() => {
-                      setOpen(false);
-                      handleNavClick("/login");
-                    }}
-                    className={navbarStyles.mobileAccountLink}
-                  >
-                    <User className={navbarStyles.mobileAccountIcon} />
-                    <span>Account</span>
-                  </Link>
-                ) : (
-                  <button
-                    onClick={handleLogout}
-                    className={navbarStyles.mobileAccountButton}
-                  >
-                    <User className={navbarStyles.mobileAccountIcon} />
-                    <span>Logout</span>
-                  </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50">
+                    {user && (
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-xs font-bold text-slate-800 truncate">{user.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{user.email}</p>
+                      </div>
+                    )}
+                    <Link to="/my-orders"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}>
+                      <Package size={15} className="text-slate-400" /> My Orders
+                    </Link>
+                    <hr className="my-1 border-slate-100" />
+                    <button onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                      <LogOut size={15} /> Sign Out
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
+            ) : (
+              <Link to="/login"
+                className="hidden md:flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors">
+                <User size={14} /> Sign In
+              </Link>
+            )}
+
+            {/* Mobile toggle */}
+            <button onClick={() => setMobileOpen((p) => !p)} aria-label="Menu"
+              className="md:hidden w-10 h-10 rounded-xl flex items-center justify-center hover:bg-slate-100 transition-colors text-slate-600">
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
-        )}
-      </nav>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden bg-white border-t border-slate-100 px-4 py-4 space-y-1">
+          {NAV_ITEMS.map((item) => (
+            <Link key={item.name} to={item.href}
+              className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                isActive(item.href) ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"
+              }`}>
+              {item.name}
+            </Link>
+          ))}
+
+          <hr className="border-slate-100 my-2" />
+
+          {loggedIn ? (
+            <>
+              {user && (
+                <div className="px-4 py-2">
+                  <p className="text-xs font-bold text-slate-800">{user.name}</p>
+                  <p className="text-[11px] text-slate-400">{user.email}</p>
+                </div>
+              )}
+              <Link to="/my-orders"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                <Package size={15} /> My Orders
+              </Link>
+              <button onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors">
+                <LogOut size={15} /> Sign Out
+              </button>
+            </>
+          ) : (
+            <Link to="/login"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-700 transition-colors">
+              <User size={14} /> Sign In
+            </Link>
+          )}
+        </div>
+      )}
     </header>
   );
 }
