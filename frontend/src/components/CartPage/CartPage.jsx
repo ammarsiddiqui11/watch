@@ -1,6 +1,10 @@
 // src/pages/CartPage.jsx
 import React, { useState, useEffect } from "react";
-import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag, ChevronRight, CheckCircle2, RefreshCw, MapPin, Phone, Mail, CreditCard, FileText } from "lucide-react";
+import {
+  Plus, Minus, Trash2, ArrowLeft, ShoppingBag,
+  ChevronRight, CheckCircle2, RefreshCw,
+  MapPin, Phone, Mail, CreditCard, FileText, User,
+} from "lucide-react";
 import { useCart } from "../../CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
@@ -20,7 +24,6 @@ function normalizeImageUrl(raw) {
 
 const STEPS = ["Cart", "Details", "Review", "Placed"];
 
-// ── Step Indicator ─────────────────────────────────────────────────────────
 function StepBar({ step }) {
   return (
     <div className="flex items-center justify-center mb-8">
@@ -47,7 +50,6 @@ function StepBar({ step }) {
   );
 }
 
-// ── Cart Item ──────────────────────────────────────────────────────────────
 function CartItem({ item }) {
   const { increment, decrement, removeItem } = useCart();
   const [localQty, setLocalQty] = useState(Number(item.qty ?? 1));
@@ -60,7 +62,7 @@ function CartItem({ item }) {
         <img
           src={normalizeImageUrl(item.img)}
           alt={item.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain p-1"
           onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='100%25' height='100%25' fill='%23f1f5f9'/%3E%3C/svg%3E"; }}
         />
       </div>
@@ -69,11 +71,13 @@ function CartItem({ item }) {
         <p className="text-slate-500 text-sm font-medium mt-0.5">₹{Number(item.price).toLocaleString("en-IN")}</p>
         <div className="flex items-center gap-3 mt-2">
           <div className="inline-flex items-center gap-2 border border-slate-200 rounded-full px-3 py-1 bg-white">
-            <button onClick={() => { if (localQty <= 1) removeItem(item.id); else { setLocalQty(q => q - 1); decrement(item.id); } }} className="text-slate-500 hover:text-slate-900 transition">
+            <button onClick={() => { if (localQty <= 1) removeItem(item.id); else { setLocalQty(q => q - 1); decrement(item.id); } }}
+              className="text-slate-500 hover:text-slate-900 transition">
               <Minus size={13} />
             </button>
             <span className="text-sm font-bold w-4 text-center">{localQty}</span>
-            <button onClick={() => { setLocalQty(q => q + 1); increment(item.id); }} className="text-slate-500 hover:text-slate-900 transition">
+            <button onClick={() => { setLocalQty(q => q + 1); increment(item.id); }}
+              className="text-slate-500 hover:text-slate-900 transition">
               <Plus size={13} />
             </button>
           </div>
@@ -89,7 +93,6 @@ function CartItem({ item }) {
   );
 }
 
-// ── Order Summary Sidebar ──────────────────────────────────────────────────
 function OrderSummary({ cart, totalPrice }) {
   const tax = totalPrice * 0.08;
   return (
@@ -117,7 +120,6 @@ function OrderSummary({ cart, totalPrice }) {
   );
 }
 
-// ── Input helper ───────────────────────────────────────────────────────────
 function Field({ icon: Icon, label, required, children }) {
   return (
     <div className="space-y-1.5">
@@ -131,12 +133,11 @@ function Field({ icon: Icon, label, required, children }) {
 
 const inputCls = "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-slate-900 outline-none transition placeholder:text-slate-300";
 
-// ── Main CartPage ──────────────────────────────────────────────────────────
 export default function CartPage() {
   const { cart, clearCart, totalPrice } = useCart();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState(0); // 0=cart, 1=details, 2=review, 3=placed
+  const [step, setStep] = useState(0);
   const [form, setForm] = useState({ name: "", email: "", mobile: "", address: "", note: "", paymentMethod: "" });
   const [submitting, setSubmitting] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
@@ -281,7 +282,9 @@ export default function CartPage() {
               </Field>
 
               <Field icon={MapPin} label="Delivery Address" required>
-                <textarea value={form.address} onChange={setField("address")} rows={3} placeholder="House no., Street, City, State, PIN" className={`${inputCls} resize-none`} />
+                <textarea value={form.address} onChange={setField("address")} rows={3}
+                  placeholder="House no., Street, City, State, PIN"
+                  className={`${inputCls} resize-none`} />
               </Field>
 
               <Field icon={CreditCard} label="Payment Method" required>
@@ -293,7 +296,9 @@ export default function CartPage() {
               </Field>
 
               <Field icon={FileText} label="Order Notes">
-                <textarea value={form.note} onChange={setField("note")} rows={2} placeholder="Special instructions, delivery preferences… (optional)" className={`${inputCls} resize-none`} />
+                <textarea value={form.note} onChange={setField("note")} rows={2}
+                  placeholder="Special instructions, delivery preferences… (optional)"
+                  className={`${inputCls} resize-none`} />
               </Field>
             </div>
 
@@ -328,14 +333,13 @@ export default function CartPage() {
           <StepBar step={2} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
-              {/* Delivery Info */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                 <h3 className="font-bold text-slate-900 mb-4">Delivery Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   {[
-                    { label: "Name", value: form.name },
-                    { label: "Email", value: form.email },
-                    { label: "Mobile", value: form.mobile },
+                    { label: "Name",    value: form.name },
+                    { label: "Email",   value: form.email },
+                    { label: "Mobile",  value: form.mobile },
                     { label: "Payment", value: form.paymentMethod },
                   ].map((r) => (
                     <div key={r.label} className="bg-slate-50 rounded-xl px-4 py-3">
@@ -356,13 +360,13 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Items */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                 <h3 className="font-bold text-slate-900 mb-4">Items ({cart.length})</h3>
                 {cart.map((item) => (
                   <div key={item.id} className="flex gap-3 items-center py-3 border-b border-slate-100 last:border-0">
                     <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                      <img src={normalizeImageUrl(item.img)} alt={item.name} className="w-full h-full object-cover"
+                      <img src={normalizeImageUrl(item.img)} alt={item.name}
+                        className="w-full h-full object-contain p-1"
                         onError={(e) => { e.currentTarget.style.display = "none"; }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -381,9 +385,11 @@ export default function CartPage() {
               <OrderSummary cart={cart} totalPrice={totalPrice} />
 
               {form.paymentMethod === "Cash on Delivery" && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                  <p className="font-bold mb-1">Cash on Delivery</p>
-                  <p className="text-amber-700 text-xs leading-relaxed">Please keep ₹{(totalPrice + tax).toLocaleString("en-IN", { minimumFractionDigits: 2 })} ready at the time of delivery.</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+                  <p className="font-bold text-amber-800 mb-1">Cash on Delivery</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    Please keep ₹{(totalPrice + tax).toLocaleString("en-IN", { minimumFractionDigits: 2 })} ready at the time of delivery.
+                  </p>
                 </div>
               )}
 
@@ -392,7 +398,9 @@ export default function CartPage() {
                 disabled={submitting}
                 className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-lg shadow-slate-200 disabled:opacity-60"
               >
-                {submitting ? <><RefreshCw size={15} className="animate-spin" /> Processing…</> : <><CheckCircle2 size={15} /> Place Order</>}
+                {submitting
+                  ? <><RefreshCw size={15} className="animate-spin" /> Processing…</>
+                  : <><CheckCircle2 size={15} /> Place Order</>}
               </button>
               <p className="text-center text-xs text-slate-400">
                 A confirmation email will be sent to <strong>{form.email}</strong>
