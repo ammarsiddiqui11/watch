@@ -25,24 +25,28 @@ export default function AddPage() {
   const [activeColor, setActiveColor] = useState("grey");
   const [category, setCategory] = useState("men");
   const [brandName, setBrandName] = useState("");
+  const [brands, setBrands] = useState([]);
+  const [brandsLoading, setBrandsLoading] = useState(false);
 
   const inputRef = useRef(null);
   const API_BASE = "http://localhost:4000";
-  const BRANDS = [
-    "Rolex",
-    "Omega",
-    "Audemars Piguet",
-    "Cartier",
-    "Breitling",
-    "IWC",
-    "Hublot",
-    "Jaeger LeCoultre",
-    "Tag Heuer",
-    "Patek Philippe",
-  ];
+
 
   const theme = themes[activeColor];
   const inputClass = getInputClass(theme);
+
+  //brands from the db
+  useEffect(() => {
+  setBrandsLoading(true);
+  axios
+    .get(`${API_BASE}/api/brands`)
+    .then((res) => {
+      const raw = res.data?.brands ?? [];
+      setBrands(raw);
+    })
+    .catch(() => toast.error("Could not load brands."))
+    .finally(() => setBrandsLoading(false));
+}, []);
 
   // FIX: Revoke all object-URLs when imageFiles changes to avoid memory leaks
   useEffect(() => {
@@ -290,27 +294,28 @@ export default function AddPage() {
             </div>
 
             {category === "brand" && (
-              <div>
-                <div className={classes.formLabelSimple}>
-                  Brand <span className={classes.requiredStar}>*</span>
-                </div>
-                <select
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                  className={inputClass}
-                  required
-                  disabled={loading}
-                >
-                  <option value="">Select brand</option>
-                  {BRANDS.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+            <div>
+              <div className={classes.formLabelSimple}>
+                Brand <span className={classes.requiredStar}>*</span>
               </div>
-            )}
-
+              <select
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                className={inputClass}
+                required
+                disabled={loading || brandsLoading}
+              >
+                <option value="">
+                  {brandsLoading ? "Loading brands…" : "Select brand"}
+                </option>
+                {brands.map((b) => (
+                  <option key={b._id} value={b.slug}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
             <div>
               <div className={classes.formLabelSimple}>
                 Description <span className={classes.requiredStar}>*</span>
